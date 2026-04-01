@@ -1,0 +1,37 @@
+cabal-version:       2.4
+name:                normalization
+version:             0.1.0.0
+synopsis:            Normalization of natural deduction proof terms
+description:
+  Haskell implementation of normalization for proof terms.
+build-type:          Simple
+
+common warnings
+  ghc-options: -Wall 
+
+library
+  import:           warnings
+  hs-source-dirs:   src
+  default-language: GHC2021
+  exposed-modules:
+    Syntax
+    Pretty
+    FreeVars
+    Substitution
+    Typecheck
+    Reduction.Common
+    Reduction.Beta
+    Normalize
+    Examples
+  build-depends:
+    base       >= 4.19 && < 5,
+    containers >= 0.6  && < 0.8
+
+executable normalization
+  import:           warnings
+  hs-source-dirs:   app
+  main-is:          Main.hs
+  default-language: GHC2021
+  build-depends:
+    base          >= 4.19 && < 5,
+    normalization
