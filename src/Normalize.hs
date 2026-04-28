@@ -1,6 +1,5 @@
 module Normalize
-  ( isNormal
-  , normalizeTrace
+  ( normalizeTrace
   , normalize
   , printTrace
   ) where
@@ -8,22 +7,25 @@ module Normalize
 import Syntax
 import Pretty (ppTerm)
 import Reduction.Common (Step(..))
-import Reduction.Beta (stepBeta)
+import Reduction.Detour (stepDetour)
+import Reduction.Permutation (stepPerm)
 
--- A term is normal iff no beta redex exists anywhere.
-isNormal :: Term -> Bool
-isNormal t = case stepBeta t of
-  Nothing -> True
-  Just _  -> False
+-- Perform a detour conversion if possible.
+-- Otherwise, apply a permutation conversion if possible.
+stepAny :: Term -> Maybe Step
+stepAny t =
+  case stepDetour t of
+    Just s  -> Just s
+    Nothing -> stepPerm t
 
--- Produce a reduction trace (list of steps from start to normal form).
--- Returns an empty list if the term is already normal.
+-- Produce a reduction trace (list of steps from start to mixed normal form).
+-- Returns an empty list if no detour or permutation step is available.
 normalizeTrace :: Term -> [Step]
-normalizeTrace t = case stepBeta t of
+normalizeTrace t = case stepAny t of
   Nothing   -> []
   Just step -> step : normalizeTrace (stepAfter step)
 
--- Normalize a term, returning the final result.
+-- Normalize a term with respect to detour and permutation conversions.
 normalize :: Term -> Term
 normalize t = case normalizeTrace t of
   []    -> t
@@ -35,7 +37,6 @@ printTrace t = do
   let steps = normalizeTrace t
   putStrLn $ "  [0] " ++ ppTerm t
   mapM_ printStep (zip [1 :: Int ..] steps)
-  putStrLn $ "  (" ++ show (length steps) ++ " reduction steps)"
   where
     printStep (i, step) =
       putStrLn $ "  [" ++ show i ++ "] " ++ ppTerm (stepAfter step)

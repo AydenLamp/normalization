@@ -3,7 +3,7 @@ module Substitution
   , subst
   ) where
 
-import Data.Set (Set) -- import the type `Set`
+import Data.Set (Set)
 import qualified Data.Set as Set
 
 import Syntax
@@ -15,36 +15,65 @@ import FreeVars (freeVars, freshLike)
 renameBound :: Name -> Name -> Term -> Term
 renameBound old new = go
   where
-    go (Var x)  -- just replace the variable if it is old
+    go (Var x)
       | x == old = Var new
       | otherwise = Var x
-    go (Lam x ty body)
-      | x == old = Lam x ty body   -- leave as-is
-      | otherwise = Lam x ty (go body)
+    go (Lam x body)
+      | x == old  = Lam x body -- old is shadowed here
+      | otherwise = Lam x (go body)
     go (App f a) = App (go f) (go a)
+    go (Pair m n) = Pair (go m) (go n)
+    go (Fst m) = Fst (go m)
+    go (Snd m) = Snd (go m)
+    go (Inl m) = Inl (go m)
+    go (Inr m) = Inr (go m)
+    -- Case x y m n o: old is shadowed in n by x, in o by y.
+    go (Case x y m n o)
+      | x == old  = Case x y (go m) n (go o)
+      | y == old  = Case x y (go m) (go n) o
+      | otherwise = Case x y (go m) (go n) (go o)
 
--- subst x s t replaces free occurrences of x in t by s, while renaming bound variables
--- in t to avoid capture of free variables. 
--- e.g. given, subst "x" (Var "y") (Lam "y" A (Var "x"))
---   Wrong: Lam "y" A (Var "y") 
---   Correct: Lam "y'" A (Var "y") 
+-- subst x s t replaces all free occurrences of x in t by s, renaming
+-- binders in t whenever necessary to avoid capturing free variables of s.
+-- Example: subst "x" (Var "y") (Lam "y" (Var "x"))
+--   Wrong:   Lam "y" (Var "y")        (y captured)
+--   Correct: Lam "y'" (Var "y")
 subst :: Name -> Term -> Term -> Term
 subst x s = go
   where
     sFV :: Set Name
-    sFV = freeVars s -- the set of free variables in s (the thing we are replacing x with)
+    sFV = freeVars s
 
+    go :: Term -> Term
     go (Var y)
-      | y == x = s  -- replace x with s
+      | y == x = s -- replace x with s
       | otherwise = Var y
-    go (App f a)   = App (go f) (go a)
-    go (Lam y ty body)
-      | y == x = Lam y ty body  -- x is bound here, so leave as is
-      | y `Set.member` sFV =  
-          -- If the binder y is free in s, then we rename y in the lambda so that we avoid capture. 
-          -- `avoid` is the set of variables we cannot use for the new name
+    go (App f a) = App (go f) (go a)
+    go (Pair m n) = Pair (go m) (go n)
+    go (Fst m) = Fst (go m)
+    go (Snd m) = Snd (go m)
+    go (Inl m) = Inl (go m)
+    go (Inr m) = Inr (go m)
+    go (Lam y body)
+      | y == x = Lam y body   -- x is bound here
+      | y `Set.member` sFV =  -- y would capture a free var of s, so rename y
           let avoid = Set.unions [sFV, freeVars body, Set.singleton x]
-              y' = freshLike y avoid -- generate a fresh name for y
-          -- replace y with y' in the body, and continue substituting
-          in  Lam y' ty (go (renameBound y y' body))
-      | otherwise   = Lam y ty (go body)
+              y' = freshLike y avoid
+          in Lam y' (go (renameBound y y' body))
+      | otherwise = Lam y (go body)
+    go (Case y z m n o) =
+      let m'       = go m
+          (y', n') = substBinder y n
+          (z', o') = substBinder z o
+      in  Case y' z' m' n' o'
+
+    -- Perform substitution under a single binder b in term t.
+    -- Returns the (possibly renamed) binder and the substituted body.
+    substBinder :: Name -> Term -> (Name, Term)
+    substBinder b t
+      | b == x = (b, t) -- b shadows x; no substitution in t
+      | b `Set.member` sFV = -- b would capture a free var of s; rename b
+          let avoid = Set.unions [sFV, freeVars t, Set.singleton x]
+              b' = freshLike b avoid
+          in (b', go (renameBound b b' t))
+      | otherwise = (b, go t)

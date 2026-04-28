@@ -1,50 +1,54 @@
 module Main (main) where
 
-import Pretty (ppType, ppTerm)
-import Typecheck (Context, inferType)
-import Normalize (isNormal, normalize, printTrace)
+import Pretty (ppTerm)
+import Normalize (normalize, printTrace)
 import Syntax (Term)
 import Examples
 
 main :: IO ()
 main = do
-  putStrLn "=== Stage 1: Implication-only STLC ==="
+  putStrLn "=== λ→∧∨: Detour + Permutation conversions ==="
   putStrLn ""
 
-  runExample "Identity: λx:A. x"
-    ctxIdentity exIdentity
+  putStrLn "--- Implication (rule 1: β-reduction) ---"
+  putStrLn ""
+  runExample "Identity" exIdentity
+  runExample "Identity Application" exAppId
+  runExample "Constant Application" exAppConst
+  runExample "Nested Application" exNested
+  runExample "Capture Avoidance" exCapture
+  runExample "Self Application" exSelfApp
 
-  runExample "Constant: λx:A. λy:B. x"
-    ctxConst exConst
+  putStrLn "--- Conjunction (rules 2 & 3: fst/snd detour) ---"
+  putStrLn ""
+  runExample "First Projection" exFstPair
+  runExample "Second Projection" exSndPair
+  runExample "Nested Projection" exFstNested
 
-  runExample "Identity applied: (λx:A. x) a"
-    ctxAppId exAppId
+  putStrLn "--- Disjunction (rules 4 & 5: case detour) ---"
+  putStrLn ""
+  runExample "Left Case Reduction" exCaseInl
+  runExample "Right Case Reduction" exCaseInr
 
-  runExample "Constant applied: (λx:A. λy:B. x) a b"
-    ctxAppConst exAppConst
+  putStrLn "--- Permutation (Definition 2) ---"
+  putStrLn ""
+  runExample "App Over Case" exPermAppCase
+  runExample "Fst Over Case" exPermFstCase
+  runExample "Snd Over Case" exPermSndCase
+  runExample "Case Over Case" exPermCaseCase
+  runExample "DetourFirst Interaction" exDetourFirstVsPerm
 
-  runExample "Nested: (λf:A→A. λx:A. f x) (λy:A. y)"
-    ctxNested exNested
+  putStrLn "--- Mixed ---"
+  putStrLn ""
+  runExample "Beta Then Projection" exBetaThenFst
 
-  runExample "Capture test: (λz:(A→A→A). z y) (λx:A. λy:A. x)"
-    ctxCapture exCapture
-
-  runExample "Self-app: (λf:((A→A)→A→A). f (λx:A. x)) (λg:A→A. λx:A. g x)"
-    ctxSelfApp exSelfApp
-
--- Run a single example: show the term, infer its type, print the
---   reduction trace, and report whether the result is normal.
-runExample :: String -> Context -> Term -> IO ()
-runExample label ctx term = do
+-- Run a single example: pretty-print the term and show the reduction trace.
+runExample :: String -> Term -> IO ()
+runExample label term = do
   putStrLn $ "--- " ++ label ++ " ---"
   putStrLn $ "  Term:  " ++ ppTerm term
-  case inferType ctx term of -- try to infer the type
-    Left err -> putStrLn $ "  Type error: " ++ show err
-    Right ty -> do
-      putStrLn $ "  Type:  " ++ ppType ty
-      putStrLn   "  Trace:"
-      printTrace term
-      let nf = normalize term
-      putStrLn $ "  Normal form: " ++ ppTerm nf
-      putStrLn $ "  Is normal:   " ++ show (isNormal nf)
+  putStrLn   "  Trace:"
+  printTrace term
+  let nf = normalize term
+  putStrLn $ "  Normal form: " ++ ppTerm nf
   putStrLn ""

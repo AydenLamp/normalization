@@ -18,9 +18,9 @@ library
     Pretty
     FreeVars
     Substitution
-    Typecheck
     Reduction.Common
-    Reduction.Beta
+    Reduction.Detour
+    Reduction.Permutation
     Normalize
     Examples
   build-depends:

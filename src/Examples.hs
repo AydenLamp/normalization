@@ -1,89 +1,160 @@
 module Examples
-  ( -- * Atomic types
-    tyA, tyB, tyC
-    -- * Sample terms and their contexts
-  , exIdentity,     ctxIdentity
-  , exConst,        ctxConst
-  , exAppId,        ctxAppId
-  , exAppConst,     ctxAppConst
-  , exNested,       ctxNested
-  , exCapture,      ctxCapture
-  , exSelfApp,      ctxSelfApp
+  ( -- * Implication examples (rule 1: β-reduction)
+    exIdentity
+  , exConst
+  , exAppId
+  , exAppConst
+  , exNested
+  , exCapture
+  , exSelfApp
+    -- * Conjunction examples (rules 2 & 3: fst/snd detour)
+  , exFstPair
+  , exSndPair
+  , exFstNested
+    -- * Disjunction examples (rules 4 & 5: case detour)
+  , exCaseInl
+  , exCaseInr
+    -- * Permutation examples (Definition 2)
+  , exPermAppCase
+  , exPermFstCase
+  , exPermSndCase
+  , exPermCaseCase
+  , exDetourFirstVsPerm
+    -- * Mixed examples
+  , exBetaThenFst
   ) where
 
-import qualified Data.Map as Map
-
 import Syntax
-import Typecheck (Context)
 
--- Define atomic types
-tyA, tyB, tyC :: Type
-tyA = TyAtom "A"
-tyB = TyAtom "B"
-tyC = TyAtom "C"
+-- -----------------------------------------------------------------------
+-- Implication examples
+-- -----------------------------------------------------------------------
 
--- Example 1: λx:A. x
+-- λx. x
 exIdentity :: Term
-exIdentity = Lam "x" tyA (Var "x")
+exIdentity = Lam "x" (Var "x")
 
-ctxIdentity :: Context
-ctxIdentity = Map.empty
-
--- Example 2: λx:A. λy:B. x
+-- λx. λy. x
 exConst :: Term
-exConst = Lam "x" tyA (Lam "y" tyB (Var "x"))
+exConst = Lam "x" (Lam "y" (Var "x"))
 
-ctxConst :: Context
-ctxConst = Map.empty
-
--- Example 3: (λx:A. x) a
--- with a : A in context.
+-- (λx. x) a  →D  a
 exAppId :: Term
 exAppId = App exIdentity (Var "a")
 
-ctxAppId :: Context
-ctxAppId = Map.singleton "a" tyA
-
--- Example 4: (λx:A. λy:B. x) a b
--- with a : A, b : B in context.
+-- (λx. λy. x) a b  →D*  a
 exAppConst :: Term
 exAppConst = App (App exConst (Var "a")) (Var "b")
 
-ctxAppConst :: Context
-ctxAppConst = Map.fromList [("a", tyA), ("b", tyB)]
-
--- Example 5: (λf:A→A. λx:A. f x) (λy:A. y)
--- Should reduce to λx:A. x in two steps.
+-- (λf. λx. f x) (λy. y)  →D*  λx. x
 exNested :: Term
 exNested = App
-  (Lam "f" (TyArr tyA tyA) (Lam "x" tyA (App (Var "f") (Var "x"))))
+  (Lam "f" (Lam "x" (App (Var "f") (Var "x"))))
   exIdentity
 
-ctxNested :: Context
-ctxNested = Map.empty
-
--- Example 6: (λz:A→A. z y) (λx:A. λy:A. x)
--- where y : A is free.
--- The beta step substitutes (λx:A. λy:A. x) for z in (z y),
--- giving ((λx:A. λy:A. x) y), which then reduces to (λy':A. y).
--- The binder y must be renamed to avoid capturing the free y.
-
+-- (λz. z y) (λx. λy. x)  →D*  λy'. y
+-- The binder y must be renamed to avoid capturing the free variable y.
 exCapture :: Term
 exCapture = App
-  (Lam "z" (TyArr tyA (TyArr tyA tyA))
-    (App (Var "z") (Var "y")))
-  (Lam "x" tyA (Lam "y" tyA (Var "x")))
+  (Lam "z" (App (Var "z") (Var "y")))
+  (Lam "x" (Lam "y" (Var "x")))
 
-ctxCapture :: Context
-ctxCapture = Map.singleton "y" tyA
-
--- Example 7: (λf:(A→A)→A→A. f (λx:A. x)) (λg:A→A. λx:A. g x)
---   Should reduce to λx:A. x
+-- (λf. f (λx. x)) (λg. λx. g x)  →D*  λx. x
 exSelfApp :: Term
 exSelfApp = App
-  (Lam "f" (TyArr (TyArr tyA tyA) (TyArr tyA tyA))
-    (App (Var "f") (Lam "x" tyA (Var "x"))))
-  (Lam "g" (TyArr tyA tyA) (Lam "x" tyA (App (Var "g") (Var "x"))))
+  (Lam "f" (App (Var "f") (Lam "x" (Var "x"))))
+  (Lam "g" (Lam "x" (App (Var "g") (Var "x"))))
 
-ctxSelfApp :: Context
-ctxSelfApp = Map.empty
+-- -----------------------------------------------------------------------
+-- Conjunction examples
+-- -----------------------------------------------------------------------
+
+-- fst ⟨a, b⟩  →D  a  
+-- (detour rule 2)
+exFstPair :: Term
+exFstPair = Fst (Pair (Var "a") (Var "b"))
+
+-- snd ⟨a, b⟩  →D  b                      
+-- (detour rule 3)
+exSndPair :: Term
+exSndPair = Snd (Pair (Var "a") (Var "b"))
+
+-- fst ((λp. p) ⟨a, b⟩)  →D*  a           
+-- (rule 1 then rule 2)
+exFstNested :: Term
+exFstNested = Fst (App (Lam "p" (Var "p")) (Pair (Var "a") (Var "b")))
+
+-- -----------------------------------------------------------------------
+-- Disjunction examples
+-- -----------------------------------------------------------------------
+
+-- case (inl a) of { inl x → x | inr y → b }  →D  a     
+-- (detour rule 4)
+exCaseInl :: Term
+exCaseInl = Case "x" "y" (Inl (Var "a")) (Var "x") (Var "b")
+
+-- case (inr b) of { inl x → a | inr y → y }  →D  b     
+-- (detour rule 5)
+exCaseInr :: Term
+exCaseInr = Case "x" "y" (Inr (Var "b")) (Var "a") (Var "y")
+
+-- -----------------------------------------------------------------------
+-- Permutation examples
+-- -----------------------------------------------------------------------
+
+-- Rule 1: application over case
+-- (case s of { inl x → (λz. x) | inr y → (λz. y) }) u
+--   →P case s of { inl x → (λz. x) u | inr y → (λz. y) u }
+exPermAppCase :: Term
+exPermAppCase =
+  App
+    (Case "x" "y" (Var "s")
+      (Lam "z" (Var "x"))
+      (Lam "z" (Var "y")))
+    (Var "u")
+
+-- Rule 2: fst over case
+-- fst (case s of { inl x → ⟨x, a⟩ | inr y → ⟨a, y⟩ })
+--   →P case s of { inl x → fst ⟨x, a⟩ | inr y → fst ⟨a, y⟩ }
+exPermFstCase :: Term
+exPermFstCase =
+  Fst (Case "x" "y" (Var "s")
+    (Pair (Var "x") (Var "a"))
+    (Pair (Var "a") (Var "y")))
+
+-- Rule 3: snd over case
+-- snd (case s of { inl x → ⟨x, a⟩ | inr y → ⟨a, y⟩ })
+--   →P case s of { inl x → snd ⟨x, a⟩ | inr y → snd ⟨a, y⟩ }
+exPermSndCase :: Term
+exPermSndCase =
+  Snd (Case "x" "y" (Var "s")
+    (Pair (Var "x") (Var "a"))
+    (Pair (Var "a") (Var "y")))
+
+-- Rule 4: case over case
+-- case (case s of { inl x → inl x | inr y → inr y }) of { inl u → u | inr v → v }
+--   →P case s of { inl x → case (inl x) of ... | inr y → case (inr y) of ... }
+exPermCaseCase :: Term
+exPermCaseCase =
+  Case "u" "v"
+    (Case "x" "y" (Var "s") (Inl (Var "x")) (Inr (Var "y")))
+    (Var "u")
+    (Var "v")
+
+-- Both a detour step (inside the function position) and a permutation step are possible.
+exDetourFirstVsPerm :: Term
+exDetourFirstVsPerm =
+  App
+    (Case "x" "y" (Inl (Var "a"))
+      (Lam "z" (Var "x"))
+      (Lam "z" (Var "y")))
+    (Var "u")
+
+-- -----------------------------------------------------------------------
+-- Mixed
+-- -----------------------------------------------------------------------
+
+-- (λp. fst p) ⟨a, b⟩  →D*  a             
+-- (rule 1 then rule 2)
+exBetaThenFst :: Term
+exBetaThenFst = App (Lam "p" (Fst (Var "p"))) (Pair (Var "a") (Var "b"))
