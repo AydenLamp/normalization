@@ -1,6 +1,7 @@
 # Normalization
 
-A Haskell implementation of normalization in untyped lambda calculus with detour and permutation conversions, based on Philippe de Groote (2002).
+A Haskell implementation of normalization in untyped lambda calculus with detour and permutation conversions, based on Philippe de Groote, On the Strong Normalisation of Natural
+Deduction with Permutation-Conversions (2002).
 
 Under Curry-Howard, proof normalization in IPPL corresponds to term reduction in typed lambda calculus.
 
