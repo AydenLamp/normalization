@@ -21,7 +21,10 @@ module Examples
   , exPermCaseCase
   , exDetourFirstVsPerm
     -- * Mixed examples
-  , exBetaThenFst
+  , example1
+  , example2
+  , example3_normal
+  , example3_nonnormal
   ) where
 
 import Syntax
@@ -141,7 +144,7 @@ exPermCaseCase =
     (Var "u")
     (Var "v")
 
--- Both a detour step (inside the function position) and a permutation step are possible.
+-- Both a detour step and a permutation step are possible.
 exDetourFirstVsPerm :: Term
 exDetourFirstVsPerm =
   App
@@ -154,7 +157,69 @@ exDetourFirstVsPerm =
 -- Mixed
 -- -----------------------------------------------------------------------
 
--- (λp. fst p) ⟨a, b⟩  →D*  a             
--- (rule 1 then rule 2)
-exBetaThenFst :: Term
-exBetaThenFst = App (Lam "p" (Fst (Var "p"))) (Pair (Var "a") (Var "b"))
+-- (case s of { inl x → λp. fst ⟨x, p⟩ | inr y → λq. snd ⟨q, y⟩ }) u
+--   →P case s of { inl x → (λp. fst ⟨x, p⟩) u | inr y → (λq. snd ⟨q, y⟩) u }
+--   →D* case s of { inl x → x | inr y → y }
+example1 :: Term
+example1 =
+  App
+    (Case "x" "y" (Var "s")
+      (Lam "p" (Fst (Pair (Var "x") (Var "p"))))
+      (Lam "q" (Snd (Pair (Var "q") (Var "y")))))
+    (Var "u")
+
+-- fst (case (case t of { inl m → inl ⟨m, a⟩ | inr n → inr ⟨b, n⟩ })
+--           of { inl x → ⟨x, c⟩ | inr y → ⟨d, y⟩ })
+--   →P (fst-over-case), then detours in branches, then (case-over-case), then case-inl/case-inr.
+example2 :: Term
+example2 =
+  Fst
+    (Case "x" "y"
+      (Case "m" "n" (Var "t")
+        (Inl (Pair (Var "m") (Var "a")))
+        (Inr (Pair (Var "b") (Var "n"))))
+      (Pair (Var "x") (Var "c"))
+      (Pair (Var "d") (Var "y")))
+
+
+-- Example from 2.4 of de Groote. 
+-- We prove
+--   A ∧ (B ∨ C) -> (A ∧ B) ∨ (A ∧ C)
+--  
+-- Normal Proof (satisfies subformula property, already in normal form):
+--   intro p : A ∧ (B ∨ C)
+--   cases on snd p with 
+--   | inl b => inl ⟨fst p, b⟩
+--   | inr c => inr ⟨fst p, c⟩
+-- 
+-- This is the witness: 
+--   λp. case (snd p) of
+--     { inl b -> inl ⟨fst p, b⟩
+--     | inr c -> inr ⟨fst p, c⟩ }
+example3_normal :: Term
+example3_normal =
+  Lam "p"
+    (Case "b" "c" (Snd (Var "p"))
+      (Inl (Pair (Fst (Var "p")) (Var "b")))
+      (Inr (Pair (Fst (Var "p")) (Var "c"))))
+
+-- Non-normal Proof (violates subformula property before normalization):
+--   intro p : A ∧ (B ∨ C)
+--   lemma : X -> (X ∧ B) ∨ (X ∧ C)  
+--   cases on snd p with 
+--   | inl b => λx. inl ⟨x, b⟩
+--   | inr c => λx. inr ⟨x, c⟩
+--   apply lemma to fst p
+--  
+-- This is the witness:
+--   λp. (case (snd p) of
+--     { inl b -> λx. inl ⟨x, b⟩
+--     | inr c -> λx. inr ⟨x, c⟩ }) (fst p)
+example3_nonnormal :: Term
+example3_nonnormal =
+  Lam "p"
+    (App  -- implication elimination ...
+      (Case "b" "c" (Snd (Var "p"))
+        (Lam "x" (Inl (Pair (Var "x") (Var "b"))))  -- preceded by implication intro
+        (Lam "x" (Inr (Pair (Var "x") (Var "c"))))) -- Needs permutation to beta reduce
+      (Fst (Var "p")))

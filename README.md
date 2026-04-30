@@ -1,9 +1,8 @@
 # Normalization
 
-A Haskell implementation of normalization in untyped lambda calculus with detour and permutation conversions, based on Philippe de Groote, On the Strong Normalisation of Natural
-Deduction with Permutation-Conversions (2002).
+A Haskell implementation of normalization in untyped lambda calculus with detour and permutation conversions, based on Philippe de Groote, On the Strong Normalisation of Natural Deduction with Permutation-Conversions (2002).
 
-Under Curry-Howard, proof normalization in IPPL corresponds to term reduction in typed lambda calculus.
+Under Curry-Howard, proof normalization in inutistionistic positive (no negation) propositional logic (IPPL) corresponds to term reduction in typed lambda calculus with conjunction and disjunction (λ→∧∨).
 
 ## Building and running
 
@@ -16,7 +15,9 @@ cabal run normalization
 
 ### The term language λ→∧∨
 
-The calculus λ→∧∨ (Section 2.2, de Groote) is implemented as an **untyped** lambda calculus extended with products and coproducts. There are no type annotations on binders and no typechecking, so reduction is purely syntactic. This corresponds to the fact observed after Proposition 1 in de Groote that strong normalisation for permutation-conversions holds for *untyped* terms.
+The calculus λ→∧∨ (Section 2.2, de Groote) is implemented as an **untyped** lambda calculus. Without types, reduction is purely syntactic. This corresponds to the fact observed after Proposition 1 in de Groote that strong normalisation for permutation-conversions holds for *untyped* terms.
+
+TODO - The detour conversions don't have strong normilization, right?
 
 Formula grammar for IPPL (not represented in the current syntax):
 ```
@@ -68,18 +69,20 @@ The four rules (Definition 2) implemented in `Reduction/Permutation.hs`:
    `case (case M of { inl x → N | inr y → O }) of { inl u → P | inr v → Q }`
    →P `case M of { inl x → case N of { inl u → P | inr v → Q } | inr y → case O of { inl u → P | inr v → Q } }`
 
-## Reduction strategy (DetourFirst)
+## Reduction strategy
 
-`Normalize.hs` uses a DetourFirst scheduling policy for mixed reduction. We try a detour conversion first, then try a permutation conversion if none exists.
+`Normalize.hs` uses a Detour First scheduling policy for mixed reduction. We try a detour conversion first, then try a permutation conversion if none exists.
 
 This is a good strategy because detour conversions carry computational content, while permutation conversions mearly rearrange structure.
+
+TODO: does strong normalization mean that this does not matter?
 
 ### Project structure
 
 | File | Purpose |
 |------|---------|
 | `src/Syntax.hs` | `Name` and `Term` (all 9 constructors). This is the untyped raw term syntax for λ→∧∨. |
-| `src/Pretty.hs` | `ppTerm`. Unicode output: λ, ⟨⟩, and case syntax. |
+| `src/Pretty.hs` | `ppTerm`. Unicode output: λ, ⟨⟩, and case syntax. Multi-line formatting for case expressions with indentation. |
 | `src/FreeVars.hs` | `freeVars` and `freshLike`. |
 | `src/Substitution.hs` | Capture-avoiding `subst`. |
 | `src/Reduction/Common.hs` | `Step` record: `stepBefore`, `stepAfter`, `stepNote`. |
@@ -97,144 +100,294 @@ This is a good strategy because detour conversions carry computational content, 
 --- Implication (rule 1: β-reduction) ---
 
 --- Identity ---
-  Term:  λx. x
   Trace:
-  [0] λx. x
-  Normal form: λx. x
+  [0]
+  λx. x
 
 --- Identity Application ---
-  Term:  (λx. x) a
   Trace:
-  [0] (λx. x) a
-  [1] a  (β)
-  Normal form: a
+  [0]
+  (λx. x) a
+  [1]
+  a  (β)
 
---- Constant Application ---
-  Term:  (λx. λy. x) a b
+--- Application ---
   Trace:
-  [0] (λx. λy. x) a b
-  [1] (λy. a) b  (β)
-  [2] a  (β)
-  Normal form: a
+  [0]
+  (λx. λy. x) a b
+  [1]
+  (λy. a) b  (β)
+  [2]
+  a  (β)
 
 --- Nested Application ---
-  Term:  (λf. λx. f x) (λx. x)
   Trace:
-  [0] (λf. λx. f x) (λx. x)
-  [1] λx. (λx. x) x  (β)
-  [2] λx. x  (β)
-  Normal form: λx. x
+  [0]
+  (λf. λx. f x) (λx. x)
+  [1]
+  λx. (λx. x) x  (β)
+  [2]
+  λx. x  (β)
 
---- Capture Avoidance ---
-  Term:  (λz. z y) (λx. λy. x)
+--- Capture Avoidance example ---
   Trace:
-  [0] (λz. z y) (λx. λy. x)
-  [1] (λx. λy. x) y  (β)
-  [2] λy'. y  (β)
-  Normal form: λy'. y
+  [0]
+  (λz. z y) (λx. λy. x)
+  [1]
+  (λx. λy. x) y  (β)
+  [2]
+  λy'. y  (β)
 
---- Self Application ---
-  Term:  (λf. f (λx. x)) (λg. λx. g x)
+--- self Application ---
   Trace:
-  [0] (λf. f (λx. x)) (λg. λx. g x)
-  [1] (λg. λx. g x) (λx. x)  (β)
-  [2] λx. (λx. x) x  (β)
-  [3] λx. x  (β)
-  Normal form: λx. x
+  [0]
+  (λf. f (λx. x)) (λg. λx. g x)
+  [1]
+  (λg. λx. g x) (λx. x)  (β)
+  [2]
+  λx. (λx. x) x  (β)
+  [3]
+  λx. x  (β)
 
 --- Conjunction (rules 2 & 3: fst/snd detour) ---
 
 --- First Projection ---
-  Term:  fst ⟨a, b⟩
   Trace:
-  [0] fst ⟨a, b⟩
-  [1] a  (fst-pair)
-  Normal form: a
+  [0]
+  fst ⟨a, b⟩
+  [1]
+  a  (fst-pair)
 
 --- Second Projection ---
-  Term:  snd ⟨a, b⟩
   Trace:
-  [0] snd ⟨a, b⟩
-  [1] b  (snd-pair)
-  Normal form: b
+  [0]
+  snd ⟨a, b⟩
+  [1]
+  b  (snd-pair)
 
 --- Nested Projection ---
-  Term:  fst ((λp. p) ⟨a, b⟩)
   Trace:
-  [0] fst ((λp. p) ⟨a, b⟩)
-  [1] fst ⟨a, b⟩  (β)
-  [2] a  (fst-pair)
-  Normal form: a
+  [0]
+  fst ((λp. p) ⟨a, b⟩)
+  [1]
+  fst ⟨a, b⟩  (β)
+  [2]
+  a  (fst-pair)
 
 --- Disjunction (rules 4 & 5: case detour) ---
 
 --- Left Case Reduction ---
-  Term:  case (inl a) of { inl x → x | inr y → b }
   Trace:
-  [0] case (inl a) of { inl x → x | inr y → b }
-  [1] a  (case-inl)
-  Normal form: a
+  [0]
+  case (inl a) of
+    { inl x → x
+    | inr y → b }
+  [1]
+  a  (case-inl)
 
 --- Right Case Reduction ---
-  Term:  case (inr b) of { inl x → a | inr y → y }
   Trace:
-  [0] case (inr b) of { inl x → a | inr y → y }
-  [1] b  (case-inr)
-  Normal form: b
+  [0]
+  case (inr b) of
+    { inl x → a
+    | inr y → y }
+  [1]
+  b  (case-inr)
 
 --- Permutation (Definition 2) ---
 
 --- App Over Case ---
-  Term:  (case s of { inl x → λz. x | inr y → λz. y }) u
   Trace:
-  [0] (case s of { inl x → λz. x | inr y → λz. y }) u
-  [1] case s of { inl x → (λz. x) u | inr y → (λz. y) u }  (perm-app-case)
-  [2] case s of { inl x → x | inr y → (λz. y) u }  (β)
-  [3] case s of { inl x → x | inr y → y }  (β)
-  Normal form: case s of { inl x → x | inr y → y }
+  [0]
+  (case s of
+    { inl x → λz. x
+    | inr y → λz. y }) u
+  [1]
+  case s of
+    { inl x → (λz. x) u
+    | inr y → (λz. y) u }  (perm-app-case)
+  [2]
+  case s of
+    { inl x → x
+    | inr y → (λz. y) u }  (β)
+  [3]
+  case s of
+    { inl x → x
+    | inr y → y }  (β)
 
 --- Fst Over Case ---
-  Term:  fst (case s of { inl x → ⟨x, a⟩ | inr y → ⟨a, y⟩ })
   Trace:
-  [0] fst (case s of { inl x → ⟨x, a⟩ | inr y → ⟨a, y⟩ })
-  [1] case s of { inl x → fst ⟨x, a⟩ | inr y → fst ⟨a, y⟩ }  (perm-fst-case)
-  [2] case s of { inl x → x | inr y → fst ⟨a, y⟩ }  (fst-pair)
-  [3] case s of { inl x → x | inr y → a }  (fst-pair)
-  Normal form: case s of { inl x → x | inr y → a }
+  [0]
+  fst (case s of
+    { inl x → ⟨x, a⟩
+    | inr y → ⟨a, y⟩ })
+  [1]
+  case s of
+    { inl x → fst ⟨x, a⟩
+    | inr y → fst ⟨a, y⟩ }  (perm-fst-case)
+  [2]
+  case s of
+    { inl x → x
+    | inr y → fst ⟨a, y⟩ }  (fst-pair)
+  [3]
+  case s of
+    { inl x → x
+    | inr y → a }  (fst-pair)
 
 --- Snd Over Case ---
-  Term:  snd (case s of { inl x → ⟨x, a⟩ | inr y → ⟨a, y⟩ })
   Trace:
-  [0] snd (case s of { inl x → ⟨x, a⟩ | inr y → ⟨a, y⟩ })
-  [1] case s of { inl x → snd ⟨x, a⟩ | inr y → snd ⟨a, y⟩ }  (perm-snd-case)
-  [2] case s of { inl x → a | inr y → snd ⟨a, y⟩ }  (snd-pair)
-  [3] case s of { inl x → a | inr y → y }  (snd-pair)
-  Normal form: case s of { inl x → a | inr y → y }
+  [0]
+  snd (case s of
+    { inl x → ⟨x, a⟩
+    | inr y → ⟨a, y⟩ })
+  [1]
+  case s of
+    { inl x → snd ⟨x, a⟩
+    | inr y → snd ⟨a, y⟩ }  (perm-snd-case)
+  [2]
+  case s of
+    { inl x → a
+    | inr y → snd ⟨a, y⟩ }  (snd-pair)
+  [3]
+  case s of
+    { inl x → a
+    | inr y → y }  (snd-pair)
 
 --- Case Over Case ---
-  Term:  case (case s of { inl x → inl x | inr y → inr y }) of { inl u → u | inr v → v }
   Trace:
-  [0] case (case s of { inl x → inl x | inr y → inr y }) of { inl u → u | inr v → v }
-  [1] case s of { inl x → case (inl x) of { inl u → u | inr v → v } | inr y → case (inr y) of { inl u → u | inr v → v } }  (perm-case-case)
-  [2] case s of { inl x → x | inr y → case (inr y) of { inl u → u | inr v → v } }  (case-inl)
-  [3] case s of { inl x → x | inr y → y }  (case-inr)
-  Normal form: case s of { inl x → x | inr y → y }
+  [0]
+  case (case s of
+    { inl x → inl x
+    | inr y → inr y }) of
+    { inl u → u
+    | inr v → v }
+  [1]
+  case s of
+    { inl x → case (inl x) of
+      { inl u → u
+      | inr v → v }
+    | inr y → case (inr y) of
+      { inl u → u
+      | inr v → v } }  (perm-case-case)
+  [2]
+  case s of
+    { inl x → x
+    | inr y → case (inr y) of
+      { inl u → u
+      | inr v → v } }  (case-inl)
+  [3]
+  case s of
+    { inl x → x
+    | inr y → y }  (case-inr)
 
---- DetourFirst Interaction ---
-  Term:  (case (inl a) of { inl x → λz. x | inr y → λz. y }) u
+--- Detour First example ---
   Trace:
-  [0] (case (inl a) of { inl x → λz. x | inr y → λz. y }) u
-  [1] (λz. a) u  (case-inl)
-  [2] a  (β)
-  Normal form: a
+  [0]
+  (case (inl a) of
+    { inl x → λz. x
+    | inr y → λz. y }) u
+  [1]
+  (λz. a) u  (case-inl)
+  [2]
+  a  (β)
 
 --- Mixed ---
 
---- Beta Then Projection ---
-  Term:  (λp. fst p) ⟨a, b⟩
+--- Example 1 ---
   Trace:
-  [0] (λp. fst p) ⟨a, b⟩
-  [1] fst ⟨a, b⟩  (β)
-  [2] a  (fst-pair)
-  Normal form: a
+  [0]
+  (case s of
+    { inl x → λp. fst ⟨x, p⟩
+    | inr y → λq. snd ⟨q, y⟩ }) u
+  [1]
+  (case s of
+    { inl x → λp. x
+    | inr y → λq. snd ⟨q, y⟩ }) u  (fst-pair)
+  [2]
+  (case s of
+    { inl x → λp. x
+    | inr y → λq. y }) u  (snd-pair)
+  [3]
+  case s of
+    { inl x → (λp. x) u
+    | inr y → (λq. y) u }  (perm-app-case)
+  [4]
+  case s of
+    { inl x → x
+    | inr y → (λq. y) u }  (β)
+  [5]
+  case s of
+    { inl x → x
+    | inr y → y }  (β)
+
+--- Example 2 ---
+  Trace:
+  [0]
+  fst (case (case t of
+    { inl m → inl ⟨m, a⟩
+    | inr n → inr ⟨b, n⟩ }) of
+    { inl x → ⟨x, c⟩
+    | inr y → ⟨d, y⟩ })
+  [1]
+  case (case t of
+    { inl m → inl ⟨m, a⟩
+    | inr n → inr ⟨b, n⟩ }) of
+    { inl x → fst ⟨x, c⟩
+    | inr y → fst ⟨d, y⟩ }  (perm-fst-case)
+  [2]
+  case (case t of
+    { inl m → inl ⟨m, a⟩
+    | inr n → inr ⟨b, n⟩ }) of
+    { inl x → x
+    | inr y → fst ⟨d, y⟩ }  (fst-pair)
+  [3]
+  case (case t of
+    { inl m → inl ⟨m, a⟩
+    | inr n → inr ⟨b, n⟩ }) of
+    { inl x → x
+    | inr y → d }  (fst-pair)
+  [4]
+  case t of
+    { inl m → case (inl ⟨m, a⟩) of
+      { inl x → x
+      | inr y → d }
+    | inr n → case (inr ⟨b, n⟩) of
+      { inl x → x
+      | inr y → d } }  (perm-case-case)
+  [5]
+  case t of
+    { inl m → ⟨m, a⟩
+    | inr n → case (inr ⟨b, n⟩) of
+      { inl x → x
+      | inr y → d } }  (case-inl)
+  [6]
+  case t of
+    { inl m → ⟨m, a⟩
+    | inr n → d }  (case-inr)
+
+--- Example 3 (Normal) ---
+  Trace:
+  [0]
+  λp. case (snd p) of
+    { inl b → inl ⟨fst p, b⟩
+    | inr c → inr ⟨fst p, c⟩ }
+
+--- Example 3 (Non-normal) ---
+  Trace:
+  [0]
+  λp. (case (snd p) of
+    { inl b → λx. inl ⟨x, b⟩
+    | inr c → λx. inr ⟨x, c⟩ }) (fst p)
+  [1]
+  λp. case (snd p) of
+    { inl b → (λx. inl ⟨x, b⟩) (fst p)
+    | inr c → (λx. inr ⟨x, c⟩) (fst p) }  (perm-app-case)
+  [2]
+  λp. case (snd p) of
+    { inl b → inl ⟨fst p, b⟩
+    | inr c → (λx. inr ⟨x, c⟩) (fst p) }  (β)
+  [3]
+  λp. case (snd p) of
+    { inl b → inl ⟨fst p, b⟩
+    | inr c → inr ⟨fst p, c⟩ }  (β)
 ```

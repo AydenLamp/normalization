@@ -9,6 +9,7 @@ import Pretty (ppTerm)
 import Reduction.Common (Step(..))
 import Reduction.Detour (stepDetour)
 import Reduction.Permutation (stepPerm)
+import Data.List (intercalate)
 
 -- Perform a detour conversion if possible.
 -- Otherwise, apply a permutation conversion if possible.
@@ -35,9 +36,18 @@ normalize t = case normalizeTrace t of
 printTrace :: Term -> IO ()
 printTrace t = do
   let steps = normalizeTrace t
-  putStrLn $ "  [0] " ++ ppTerm t
+  putStrLn "  [0]"
+  putStrLn $ "  " ++ indentAllLines (ppTerm t)
   mapM_ printStep (zip [1 :: Int ..] steps)
   where
-    printStep (i, step) =
-      putStrLn $ "  [" ++ show i ++ "] " ++ ppTerm (stepAfter step)
-                 ++ "  (" ++ stepNote step ++ ")"
+    printStep (i, step) = do
+      putStrLn $ "  [" ++ show i ++ "]"
+      let termStr = ppTerm (stepAfter step)
+          lastLine = last (lines termStr)
+          otherLines = init (lines termStr)
+          note = "  (" ++ stepNote step ++ ")"
+      mapM_ (\l -> putStrLn $ "  " ++ l) otherLines
+      putStrLn $ "  " ++ lastLine ++ note
+
+indentAllLines :: String -> String
+indentAllLines s = intercalate "\n  " (lines s)

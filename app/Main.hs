@@ -1,7 +1,6 @@
 module Main (main) where
 
-import Pretty (ppTerm)
-import Normalize (normalize, printTrace)
+import Normalize (printTrace)
 import Syntax (Term)
 import Examples
 
@@ -14,10 +13,10 @@ main = do
   putStrLn ""
   runExample "Identity" exIdentity
   runExample "Identity Application" exAppId
-  runExample "Constant Application" exAppConst
+  runExample "Application" exAppConst
   runExample "Nested Application" exNested
-  runExample "Capture Avoidance" exCapture
-  runExample "Self Application" exSelfApp
+  runExample "Capture Avoidance example" exCapture
+  runExample "self Application" exSelfApp
 
   putStrLn "--- Conjunction (rules 2 & 3: fst/snd detour) ---"
   putStrLn ""
@@ -36,19 +35,19 @@ main = do
   runExample "Fst Over Case" exPermFstCase
   runExample "Snd Over Case" exPermSndCase
   runExample "Case Over Case" exPermCaseCase
-  runExample "DetourFirst Interaction" exDetourFirstVsPerm
+  runExample "Detour First example" exDetourFirstVsPerm
 
   putStrLn "--- Mixed ---"
   putStrLn ""
-  runExample "Beta Then Projection" exBetaThenFst
+  runExample "Example 1" example1
+  runExample "Example 2" example2
+  runExample "Example 3 (Normal)" example3_normal
+  runExample "Example 3 (Non-normal)" example3_nonnormal
 
--- Run a single example: pretty-print the term and show the reduction trace.
+-- Run a single example: print the reduction trace (step [0] is the starting term).
 runExample :: String -> Term -> IO ()
 runExample label term = do
   putStrLn $ "--- " ++ label ++ " ---"
-  putStrLn $ "  Term:  " ++ ppTerm term
   putStrLn   "  Trace:"
   printTrace term
-  let nf = normalize term
-  putStrLn $ "  Normal form: " ++ ppTerm nf
   putStrLn ""
