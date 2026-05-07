@@ -9,7 +9,7 @@ type Name = String
 -- Terms of the untyped lambda calculus λ→∧∨.
 -- See Section 2.2 of de Groote (2002).
 data Term
-  = Var  Name  
+  = Var Name
   | Lam  Name Term -- λx. M  (implication intro)
   | App  Term Term -- M N  (implication elim)
   | Pair Term Term -- p(M, N)  (conjunction intro)
@@ -18,5 +18,5 @@ data Term
   | Inl  Term      -- k1 M  (disjunction intro)
   | Inr  Term      -- k2 M  (disjunction intro)
   -- D_{x,y}(M, N, O)  (disjunction elim; M is disjunction; x bound in N, y bound in O)
-  | Case Name Name Term Term Term  
+  | Case Name Name Term Term Term
   deriving (Eq, Show)

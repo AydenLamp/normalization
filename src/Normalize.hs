@@ -28,9 +28,12 @@ normalizeTrace t = case stepAny t of
 
 -- Normalize a term with respect to detour and permutation conversions.
 normalize :: Term -> Term
-normalize t = case normalizeTrace t of
-  []    -> t
-  steps -> stepAfter (last steps)
+normalize = go
+  where
+    go t =
+      case stepAny t of
+        Nothing -> t
+        Just s -> go (stepAfter s)
 
 -- Print a full reduction trace to stdout, numbering each step.
 printTrace :: Term -> IO ()
@@ -43,11 +46,17 @@ printTrace t = do
     printStep (i, step) = do
       putStrLn $ "  [" ++ show i ++ "]"
       let termStr = ppTerm (stepAfter step)
-          lastLine = last (lines termStr)
-          otherLines = init (lines termStr)
+          (otherLines, lastLine) = splitLast (lines termStr)
           note = "  (" ++ stepNote step ++ ")"
       mapM_ (\l -> putStrLn $ "  " ++ l) otherLines
       putStrLn $ "  " ++ lastLine ++ note
+
+splitLast :: [a] -> ([a], a)
+splitLast [] = error "splitLast: empty list"
+splitLast [x] = ([], x)
+splitLast (x:xs) =
+  let (prefix, lastElem) = splitLast xs
+  in (x : prefix, lastElem)
 
 indentAllLines :: String -> String
 indentAllLines s = intercalate "\n  " (lines s)

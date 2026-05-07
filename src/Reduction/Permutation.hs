@@ -2,6 +2,8 @@ module Reduction.Permutation
   ( stepPerm
   ) where
 
+import Control.Applicative ((<|>))
+
 import Syntax
 import Reduction.Common (Step(..))
 
@@ -25,50 +27,31 @@ stepPerm t@(Case u v (Case x y m n o) p q) =
 
 -- Structural (recursive) rules
 stepPerm (App f a) =
-  case stepPerm f of
-    Just s  -> Just s { stepBefore = App f a, stepAfter = App (stepAfter s) a }
-    Nothing ->
-      case stepPerm a of
-        Just s  -> Just s { stepBefore = App f a, stepAfter = App f (stepAfter s) }
-        Nothing -> Nothing
+  rewrite1 (App f a) (`App` a) f
+    <|> rewrite1 (App f a) (App f) a
 stepPerm (Lam x body) =
-  case stepPerm body of
-    Just s  -> Just s { stepBefore = Lam x body, stepAfter = Lam x (stepAfter s) }
-    Nothing -> Nothing
+  rewrite1 (Lam x body) (Lam x) body
 stepPerm (Pair m n) =
-  case stepPerm m of
-    Just s  -> Just s { stepBefore = Pair m n, stepAfter = Pair (stepAfter s) n }
-    Nothing ->
-      case stepPerm n of
-        Just s  -> Just s { stepBefore = Pair m n, stepAfter = Pair m (stepAfter s) }
-        Nothing -> Nothing
+  rewrite1 (Pair m n) (`Pair` n) m
+    <|> rewrite1 (Pair m n) (Pair m) n
 stepPerm (Fst m) =
-  case stepPerm m of
-    Just s  -> Just s { stepBefore = Fst m, stepAfter = Fst (stepAfter s) }
-    Nothing -> Nothing
+  rewrite1 (Fst m) Fst m
 stepPerm (Snd m) =
-  case stepPerm m of
-    Just s  -> Just s { stepBefore = Snd m, stepAfter = Snd (stepAfter s) }
-    Nothing -> Nothing
+  rewrite1 (Snd m) Snd m
 stepPerm (Inl m) =
-  case stepPerm m of
-    Just s  -> Just s { stepBefore = Inl m, stepAfter = Inl (stepAfter s) }
-    Nothing -> Nothing
+  rewrite1 (Inl m) Inl m
 stepPerm (Inr m) =
-  case stepPerm m of
-    Just s  -> Just s { stepBefore = Inr m, stepAfter = Inr (stepAfter s) }
-    Nothing -> Nothing
+  rewrite1 (Inr m) Inr m
 stepPerm (Case x y m n o) =
-  case stepPerm m of
-    Just s  -> Just s { stepBefore = Case x y m n o
-                      , stepAfter  = Case x y (stepAfter s) n o }
-    Nothing ->
-      case stepPerm n of
-        Just s  -> Just s { stepBefore = Case x y m n o
-                          , stepAfter  = Case x y m (stepAfter s) o }
-        Nothing ->
-          case stepPerm o of
-            Just s  -> Just s { stepBefore = Case x y m n o
-                              , stepAfter  = Case x y m n (stepAfter s) }
-            Nothing -> Nothing
+  rewrite1 (Case x y m n o) (\m' -> Case x y m' n o) m
+    <|> rewrite1 (Case x y m n o) (\n' -> Case x y m n' o) n
+    <|> rewrite1 (Case x y m n o) (Case x y m n) o
 stepPerm (Var _) = Nothing
+
+-- whole is the original outer term
+-- rebuild is a function that plugs a rewritten subterm back into the outer term
+-- part is the subterm we're trying to rewrite
+rewrite1 :: Term -> (Term -> Term) -> Term -> Maybe Step
+rewrite1 whole rebuild part = do
+  s <- stepPerm part
+  pure s {stepBefore = whole, stepAfter = rebuild (stepAfter s)}

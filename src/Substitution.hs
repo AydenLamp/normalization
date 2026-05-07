@@ -29,8 +29,8 @@ renameBound old new = go
     go (Inr m) = Inr (go m)
     -- Case x y m n o: old is shadowed in n by x, in o by y.
     go (Case x y m n o)
-      | x == old  = Case x y (go m) n (go o)
-      | y == old  = Case x y (go m) (go n) o
+      | x == old = Case x y (go m) n (go o)
+      | y == old = Case x y (go m) (go n) o
       | otherwise = Case x y (go m) (go n) (go o)
 
 -- subst x s t replaces all free occurrences of x in t by s, renaming

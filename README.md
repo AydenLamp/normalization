@@ -4,6 +4,8 @@ A Haskell implementation of normalization in untyped lambda calculus with detour
 
 Under Curry-Howard, proof normalization in inutistionistic positive (no negation) propositional logic (IPPL) corresponds to term reduction in typed lambda calculus with conjunction and disjunction (λ→∧∨).
 
+Author- Ayden Lamparski
+
 ## Building and running
 
 ```
@@ -16,8 +18,6 @@ cabal run normalization
 ### The term language λ→∧∨
 
 The calculus λ→∧∨ (Section 2.2, de Groote) is implemented as an **untyped** lambda calculus. Without types, reduction is purely syntactic. This corresponds to the fact observed after Proposition 1 in de Groote that strong normalisation for permutation-conversions holds for *untyped* terms.
-
-TODO - The detour conversions don't have strong normilization, right?
 
 Formula grammar for IPPL (not represented in the current syntax):
 ```
@@ -71,18 +71,66 @@ The four rules (Definition 2) implemented in `Reduction/Permutation.hs`:
 
 ## Reduction strategy
 
-`Normalize.hs` uses a Detour First scheduling policy for mixed reduction. We try a detour conversion first, then try a permutation conversion if none exists.
+`Normalize.hs` tries a detour conversion first, then tries a permutation conversion if none exists.
 
 This is a good strategy because detour conversions carry computational content, while permutation conversions mearly rearrange structure.
 
-TODO: does strong normalization mean that this does not matter?
+## AI use in this project
+GitHub Copilot was used to write some functions and refactor parts of this project. In particular:
+
+- In subst, Copilot wrote with the capture-avoidance logic in the lambda and disjunction-elimination cases. This logic was tricky but not interesting from a theoretic point of view. 
+- Copilot wrote the ppTermPrec implementation for parenthesis and indentation placement for pretty-printing.
+- Copilot wrote printTrace, which prints numbered steps using an intersting trick involving a zip against an infinite list.
+- Copilot generated the examples (except example3_normal and example3_nonnormal) and wrote the section headers in main.
+
+I also asked Copilot to rewrite parts of the code in a more idiomatic Haskell style. 
+It made a lot of formatting changes, but it also made a few more interesiing changes: 
+
+It suggested the `t@...` syntax for matching on a term while binding the whole term for t. I did not know about this trick before.
+
+The most useful change was introducing rewrite1 for recursive reduction cases in stepDetour and stepPerm.
+
+Previously, stepPerm had cases like this:
+```
+stepPerm (App f a)
+  case stepPerm f of
+    Just s  -> Just s { stepBefore = App f a, stepAfter = App (stepAfter s) a }
+    Nothing ->
+      case stepPerm a of
+        Just s  -> Just s { stepBefore = App f a, stepAfter = App f (stepAfter s) }
+        Nothing -> Nothing
+```
+
+By defining
+```
+rewrite1 :: Term -> (Term -> Term) -> Term -> Maybe Step
+rewrite1 whole rebuild part = do
+  s <- stepPerm part
+  pure s {stepBefore = whole, stepAfter = rebuild (stepAfter s)}
+```
+
+this became:
+```
+stepPerm (App f a) =
+  rewrite1 (App f a) (`App` a) f
+    <|> rewrite1 (App f a) (App f) a
+```
+
+The operator <|> (from Alternative) tries the left side first:
+
+- if the left side is Just ..., it keeps that result;
+- if the left side is Nothing, it tries the right side.
+
+So in stepPerm (App f a), the reducer tries the function position first, then the argument position only if needed.
+
+I did not know this <|> pattern before, but it seems like a useful Haskell idiom.
 
 ### Project structure
 
 | File | Purpose |
 |------|---------|
-| `src/Syntax.hs` | `Name` and `Term` (all 9 constructors). This is the untyped raw term syntax for λ→∧∨. |
-| `src/Pretty.hs` | `ppTerm`. Unicode output: λ, ⟨⟩, and case syntax. Multi-line formatting for case expressions with indentation. |
+| `src/Syntax.hs` | `Name` and `Term` definitions. This is the untyped raw term syntax for λ→∧∨. |
+| `src/Pretty.hs` | `ppTerm` for pretty printing terms with Unicode output, parenthesis, and indentation. |
 | `src/FreeVars.hs` | `freeVars` and `freshLike`. |
 | `src/Substitution.hs` | Capture-avoiding `subst`. |
 | `src/Reduction/Common.hs` | `Step` record: `stepBefore`, `stepAfter`, `stepNote`. |

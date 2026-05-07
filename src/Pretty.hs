@@ -2,6 +2,8 @@ module Pretty
   ( ppTerm
   ) where
 
+import Data.List (intercalate)
+
 import Syntax
 
 -- Pretty-print a term.
@@ -34,9 +36,13 @@ ppTermPrec p ind (Inr m) =
   parensIf (p > 1) ("inr " ++ ppTermPrec 2 ind m)
 ppTermPrec p ind (Case x y m n o) =
   parensIf (p > 0)
-    ("case " ++ ppTermPrec 2 ind m ++ " of\n" ++
-     indentStr (ind + 2) ++ "{ inl " ++ x ++ " → " ++ ppTermPrec 0 (ind + 2) n ++ "\n" ++
-     indentStr (ind + 2) ++ "| inr " ++ y ++ " → " ++ ppTermPrec 0 (ind + 2) o ++ " }")
+    (intercalate "\n"
+      [ "case " ++ ppTermPrec 2 ind m ++ " of"
+      , branchIndent ++ "{ inl " ++ x ++ " → " ++ ppTermPrec 0 (ind + 2) n
+      , branchIndent ++ "| inr " ++ y ++ " → " ++ ppTermPrec 0 (ind + 2) o ++ " }"
+      ])
+  where
+    branchIndent = indentStr (ind + 2)
 
 -- Generate indentation string (spaces)
 indentStr :: Int -> String
